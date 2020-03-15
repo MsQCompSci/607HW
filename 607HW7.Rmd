@@ -1,0 +1,122 @@
+---
+title: "Data 607 Week 7 Assignment"
+author: "Layla Quinones"
+date: "3/8/2020"
+output: rmdformats::material
+---
+```{r, echo=FALSE, results='hide',message=FALSE, warning = FALSE}
+library(tidyverse)
+library(kableExtra)
+library(rvest)
+library(RCurl)
+library(XML)
+library(RJSONIO)
+```
+ > Note: tidyverse, kabelExtra, rvest, RCurl, XML, RJSONIO and rmdformats libraries used.
+ 
+# HTML Table
+
+## Approach:##
+
+1. Use `html()` from `rvest` package to read the web page from the following [link](https://raw.githubusercontent.com/MsQCompSci/607week7/master/books.html)
+
+2. Use `html_nodes()` to select the table on the page, and `html_table()` to parse it into a dataframe
+```{r, warning = FALSE}
+# Website with html table in link
+url <- "https://raw.githubusercontent.com/MsQCompSci/607week7/master/books.html"
+
+# Parses the html
+url <- read_html(url)
+
+#Reads the table in the html page (within "table" tags)
+htmlData <- html_nodes(url, "table") %>%
+  html_table(fill = TRUE) %>% #puts data in a matrix
+  .[[1]] # select the data frame (first table)
+
+#Display table
+kable(htmlData) %>%
+  kable_styling()%>%
+  scroll_box(width = "100%", height = "200px")
+```
+
+# XML Table
+
+## Approach:##
+
+1. Use `getURL()` from `RCurl` package to fetch xml file from the following [link](https://raw.githubusercontent.com/MsQCompSci/607week7/master/booksTwo.xml)
+
+2. Use `xmlParse()` to select parse the xml file, and `xmlToDataFrame()` to parse it into a dataframe
+
+```{r}
+urlXML <- "https://raw.githubusercontent.com/MsQCompSci/607week7/master/booksTwo.xml"
+
+#fetch file on internet
+xmlData <- getURL(urlXML)
+
+#parse the xml file
+xmlData <- xmlParse(xmlData, useInternal=TRUE)
+
+# cast into a table
+xmlData <- xmlToDataFrame(xmlData)
+
+#display 
+kable(xmlData)%>%
+  kable_styling()%>%
+  scroll_box(width = "100%", height = "200px")
+```
+
+# JSON Object
+
+## Approach:##
+
+1. Use `fromJSON` from the `RJSONIO` package to read the JSON from github repository [link](https://raw.githubusercontent.com/MsQCompSci/607week7/master/bookstwo.json)
+
+2. Replace all `NULL` values with `NA` and place this into a dataframe (long format). Thanks to the following resources I was able to figure out what was wrong with my code when reading the JSON file (I didn't realize I had to replace NULL values) [SOURCE](https://raw.githubusercontent.com/MsQCompSci/607week7/master/bookstwo.json)
+```{r}
+urlJSON <- "https://raw.githubusercontent.com/MsQCompSci/607week7/master/bookstwo.json"
+
+rawJSON <- fromJSON(urlJSON)
+
+#Solution found at https://www.kaggle.com/robertoruiz/how-convert-json-files-into-data-frames-in-r
+#NULL replaced with NA
+jsonData <- lapply(rawJSON, function(x) {
+  x[sapply(x, is.null)] <- NA
+  unlist(x)
+})
+
+#Place data in a long data frame (for wide use r bind)
+jsonData <- as.data.frame(do.call("cbind", jsonData))
+
+#display
+kable(jsonData)%>%
+  kable_styling()%>%
+  scroll_box(width = "100%", height = "200px")
+```
+
+# Comparing Structures
+```{r}
+#Display the sturctures of all three dataframes
+str(htmlData)
+str(xmlData)
+str(jsonData)
+```
+
+## Comments
+
+> After displaying  the structure of each dataframe, we can see that the data from the the HTML file and XML file both have the same number of variables and observations due to the fact that it is placed in a data frame with columns for each category. The JSON dataframe is in long format so the variables and observations are different however, the difference is also due to the way mutiple authors were saved (JSON differntiated between multiple authors in a book, HTML and XML did not (despite here being seperate XMLtags for each). 
+
+> Here we also see that JSON and XML columns are saved as factors meanwhile, HTML columns are characters, except for ISBN which is a numeric type.
+
+> The JSON dataframe seperates each author as it's own variable (3 authors for the first group), whereas for html and xml files, the program integrated all names in one column. I feel that JSON is more specific than XML and XML is more specific compared to HTML (because JSON differentiated between authors for the same book) and XML can be differentiated based on custom tag names.
+
+> My experience so far has been that JSON files are harder to work with and take more tidying than HTML and XML.
+
+> I wanted to note how in doing this project I learned a lot, specifically about the `do.call` function in r and I feel like my programming in r will never be the same! This documentation was super helpful[LINK](https://www.stat.berkeley.edu/~s133/Docall.html)
+
+> Alternately we can also compare the structures of these three dataframes using the `all.equal()` function. Which supports my comparison above. It gives us some insight on the attributes for each variable. We see the html data has no attribute while the xml and json data are lists. The least differences lie between xml and json data.
+
+```{r}
+all.equal(htmlData, xmlData)
+all.equal(htmlData, jsonData)
+all.equal(xml, jsonData)
+```
